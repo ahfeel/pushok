@@ -11,9 +11,13 @@
 
 namespace Pushok\AuthProvider;
 
-use Jose\Factory\JWKFactory;
-use Jose\Factory\JWSFactory;
-use Jose\Object\JWKInterface;
+use Jose\Component\KeyManagement\JWKFactory;
+use Jose\Component\Core\JWK;
+use Jose\Component\Core\AlgorithmManager;
+use Jose\Component\Core\Converter\StandardConverter;
+use Jose\Component\Signature\JWSBuilder;
+use Jose\Component\Signature\Algorithm\ES256;
+use Jose\Component\Signature\Serializer\CompactSerializer;
 use Pushok\AuthProviderInterface;
 use Pushok\Request;
 
@@ -147,9 +151,9 @@ class Token implements AuthProviderInterface
     /**
      * Generate private EC key.
      *
-     * @return JWKInterface
+     * @return JWK
      */
-    private function generatePrivateECKey(): JWKInterface
+    private function generatePrivateECKey(): JWK
     {
         return JWKFactory::createFromKeyFile($this->privateKeyPath, $this->privateKeySecret, [
             'kid' => $this->keyId,
@@ -174,10 +178,10 @@ class Token implements AuthProviderInterface
     /**
      * Get protected header.
      *
-     * @param JWKInterface $privateECKey
+     * @param JWK $privateECKey
      * @return array
      */
-    private function getProtectedHeader(JWKInterface $privateECKey): array
+    private function getProtectedHeader(JWK $privateECKey): array
     {
         return [
             'alg' => self::HASH_ALGORITHM,
@@ -193,12 +197,33 @@ class Token implements AuthProviderInterface
     private function generate(): string
     {
         $privateECKey = $this->generatePrivateECKey();
+        $protectedHeader = $this->getProtectedHeader($privateECKey);
 
-        $this->token = JWSFactory::createJWSToCompactJSON(
-            $this->getClaimsPayload(),
-            $privateECKey,
-            $this->getProtectedHeader($privateECKey)
-        );
+        // This converter wraps json_encode/json_decode with some parameters
+        $jsonConverter = new StandardConverter();
+
+        // This managers handles all algorithms we need to use.
+        $algorithmManager = AlgorithmManager::create([
+            new ES256(),
+        ]);
+
+        // The JWS Builder
+        $jwsBuilder = new JWSBuilder($jsonConverter, $algorithmManager);
+
+        // First we have to encode the payload. Now only strings are accepted.
+        $payload = $jsonConverter->encode($this->getClaimsPayload());
+
+        // We build our JWS object
+        $jws = $jwsBuilder
+            ->create()                    // Indicates we want to create a new token
+            ->withPayload($payload)       // We set the payload
+            ->addSignature($privateECKey, $protectedHeader) // We add a signature
+            ->build();                    // We compute the JWS
+
+        // We need to serialize the token.
+        // In this example we will use the compact serialization mode (most common mode).
+        $serializer = new CompactSerializer($jsonConverter);
+        $this->token = $serializer->serialize($jws);
 
         return $this->token;
     }

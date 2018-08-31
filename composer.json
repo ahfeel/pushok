@@ -21,13 +21,13 @@
     "require": {
         "php": "^7.0",
         "ext-curl": "*",
-        "lib-curl": ">=7.46.0",
-        "ext-openssl": "*",
-        "lib-openssl": ">=1.0.2.5",
         "ext-gmp": "*",
-        "ext-xml": "*",
         "ext-intl": "*",
-        "spomky-labs/jose": "^7.0.0"
+        "ext-openssl": "*",
+        "ext-xml": "*",
+        "lib-curl": ">=7.46.0",
+        "lib-openssl": ">=1.0.2.5",
+        "web-token/jwt-framework": "^1.0"
     },
     "require-dev": {
         "ext-xdebug": "*",
